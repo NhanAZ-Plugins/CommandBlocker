@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NhanAZ\CommandBlocker\blocker\command;
 
+use InvalidArgumentException;
 use NhanAZ\CommandBlocker\utils\LanguageEnums;
 use NhanAZ\CommandBlocker\utils\LanguageTrait;
 use pocketmine\player\Player;
@@ -47,6 +48,7 @@ final class Limit {
         return $this->interval;
     }
 
+    /** @return array{action: string, amount: int, interval: int} */
     public function toArray(): array {
         return [
             "action" => $this->action,
@@ -55,11 +57,19 @@ final class Limit {
         ];
     }
 
+    /** @param array<array-key, mixed> $data */
     public static function fromArray(array $data): Limit {
+        $action = $data["action"] ?? null;
+        $amount = $data["amount"] ?? null;
+        $interval = $data["interval"] ?? null;
+        if (!is_string($action) || !in_array($action, ["kick", "ban", "warn"], true)
+            || !is_int($amount) || $amount < 1 || !is_int($interval) || $interval < 1) {
+            throw new InvalidArgumentException("Limit needs a valid action, positive amount and positive interval");
+        }
         return new Limit(
-            $data["action"],
-            $data["amount"],
-            $data["interval"]
+            $action,
+            $amount,
+            $interval
         );
     }
 }

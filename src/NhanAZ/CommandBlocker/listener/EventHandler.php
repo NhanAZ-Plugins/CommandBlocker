@@ -24,9 +24,12 @@ class EventHandler implements Listener {
             return;
         }
 
-        $commandParts = explode(" ", $event->getCommand());
+        $commandParts = preg_split('/\s+/', trim($event->getCommand()));
+        if ($commandParts === false || $commandParts === []) {
+            return;
+        }
         $world = $sender->getWorld();
-        $commandName = $commandParts[0];
+        $commandName = strtolower(ltrim($commandParts[0], '/'));
 
         $commandMap = Server::getInstance()->getCommandMap();
         $command = $commandMap->getCommand($commandName);
@@ -35,23 +38,28 @@ class EventHandler implements Listener {
             return;
         }
 
-        $permission = $command->getPermissions();
+        $permission = array_values($command->getPermissions());
         $blockers = Worlds::get($world);
-        $matchingBlocker = $blockers?->testPermissions($permission);
+        $matchingBlocker = $blockers?->getCommandBlocker($command->getName())
+            ?? $blockers?->getCommandBlocker($commandName)
+            ?? $blockers?->testPermissions($permission);
 
         if (!$matchingBlocker) {
             $globalsBlocker = WorldBlocker::fromArray(Utils::getGlobals());
-            $matchingBlocker = $globalsBlocker->testPermissions($permission);
+            $matchingBlocker = $globalsBlocker->getCommandBlocker($command->getName())
+                ?? $globalsBlocker->getCommandBlocker($commandName)
+                ?? $globalsBlocker->testPermissions($permission);
         }
 
         if ($matchingBlocker) {
-            if ($matchingBlocker->hasArguments() && count($commandParts) > 1) {
-                if (!$matchingBlocker->isArgumentsBlocked(array_slice($commandParts, 1))) {
-                    return;
-                }
+            if ($matchingBlocker->hasArguments() && !$matchingBlocker->isArgumentsBlocked(array_slice($commandParts, 1))) {
+                return;
             }
             $blockerEvent = new CommandBlockerEvent($sender, $matchingBlocker);
             $blockerEvent->call();
+            if ($blockerEvent->isCancelled()) {
+                return;
+            }
             if ($matchingBlocker->hasLimit()) {
                 $matchingBlocker->trigger($sender);
             }

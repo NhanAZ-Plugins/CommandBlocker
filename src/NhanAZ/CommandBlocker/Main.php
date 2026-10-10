@@ -27,6 +27,10 @@ class Main extends PluginBase {
 
         $defaultLanguage = "eng";
         $languageCode = $this->getConfig()->get("language", $defaultLanguage);
+        if (!is_string($languageCode) || $languageCode === "") {
+            $this->getLogger()->warning("Invalid language setting, using default language");
+            $languageCode = $defaultLanguage;
+        }
         $languagesFolder = $this->getFile() . "resources/languages/";
 
         if (!file_exists($languagesFolder . $languageCode . ".ini")) {

@@ -4,31 +4,37 @@ declare(strict_types=1);
 
 namespace NhanAZ\CommandBlocker\blocker\command;
 
+use InvalidArgumentException;
 use pocketmine\player\Player;
 use pocketmine\Server;
 
 class CommandBlocker {
 
     private string $command;
+    /** @var list<string>|null */
     private ?array $arguments;
     private ?Limit $limit;
+    /** @var list<string> */
     private array $permissions;
 
+    /** @var array<string, array{lastTrigger: int, VL: int}> */
     private array $triggered = [];
 
 
+    /** @param list<string>|null $arguments */
     public function __construct(string $command, ?array $arguments = null, ?Limit $limit = null) {
         $this->command = $command;
         $this->arguments = $arguments;
         $this->limit = $limit;
         $commandMap = Server::getInstance()->getCommandMap()->getCommand($command);
-        $this->permissions = $commandMap !== null ? $commandMap->getPermissions() : [];
+        $this->permissions = $commandMap !== null ? array_values($commandMap->getPermissions()) : [];
     }
 
     public function getCommand(): string {
         return $this->command;
     }
 
+    /** @return list<string>|null */
     public function getArguments(): ?array {
         return $this->arguments;
     }
@@ -37,10 +43,12 @@ class CommandBlocker {
         return $this->limit;
     }
 
+    /** @return list<string> */
     public function getPermissions(): array {
         return $this->permissions;
     }
 
+    /** @return list<string> */
     public function getAliases() :array {
         $commandMap = Server::getInstance()->getCommandMap()->getCommand($this->getCommand());
         return $commandMap !== null ? $commandMap->getAliases() : [];
@@ -54,8 +62,9 @@ class CommandBlocker {
         return $this->arguments !== null;
     }
 
+    /** @param list<string> $arguments */
     public function isArgumentsBlocked(array $arguments): bool {
-        if (count($this->arguments) !== count($arguments)) {
+        if ($this->arguments === null || count($this->arguments) !== count($arguments)) {
             return false;
         }
         foreach ($this->arguments as $index => $argument) {
@@ -75,38 +84,32 @@ class CommandBlocker {
         return $command;
     }
 
+    /** @param list<string> $permission */
     public function testPermission(array $permission): bool {
         $intersect = array_intersect($this->permissions, $permission);
         return !empty($intersect);
     }
 
     public function trigger(Player $player): void {
-        $now = time();
-
-        if (!isset($this->triggered[$player->getName()])) {
-            $this->triggered[$player->getName()] = [
-                "lastTrigger" => $now,
-                "VL" => 0
-            ];
+        $limit = $this->limit;
+        if ($limit === null) {
             return;
         }
-
-        $lastTrigger = $this->triggered[$player->getName()]["lastTrigger"];
-        $limit = $this->getLimit();
-
-        if ($now - $lastTrigger >= $limit->getInterval()) {
-            $this->triggered[$player->getName()]["lastTrigger"] = $now;
-            $this->triggered[$player->getName()]["VL"] = 0;
-        } else {
-            $this->triggered[$player->getName()]["VL"]++;
+        $now = time();
+        $name = strtolower($player->getName());
+        $state = $this->triggered[$name] ?? ["lastTrigger" => $now, "VL" => 0];
+        if ($now - $state["lastTrigger"] >= $limit->getInterval()) {
+            $state = ["lastTrigger" => $now, "VL" => 0];
         }
-
-        if ($this->triggered[$player->getName()]["VL"] >= $limit->getAmount()) {
+        $state["VL"]++;
+        $this->triggered[$name] = $state;
+        if ($state["VL"] >= $limit->getAmount()) {
             $limit->handle($player);
         }
     }
 
 
+    /** @return array<string, mixed> */
     public function toArray() :array {
         return [
             "command" => $this->command,
@@ -116,11 +119,27 @@ class CommandBlocker {
         ];
     }
 
+    /** @param array<array-key, mixed> $array */
     public static function create(string $command, array $array = []) :self {
+        $arguments = $array["arguments"] ?? null;
+        if ($arguments !== null && (!is_array($arguments) || !array_is_list($arguments))) {
+            throw new InvalidArgumentException("Command arguments must be a list of strings");
+        }
+        if ($arguments !== null) {
+            foreach ($arguments as $argument) {
+                if (!is_string($argument)) {
+                    throw new InvalidArgumentException("Command arguments must be strings");
+                }
+            }
+        }
+        $limitData = $array["limit"] ?? null;
+        if ($limitData !== null && !is_array($limitData)) {
+            throw new InvalidArgumentException("Command limit must be a map");
+        }
         return new self(
             $command,
-            $array["arguments"] ?? null,
-            isset($array["limit"]) ? Limit::fromArray($array["limit"]) : null
+            $arguments,
+            $limitData !== null ? Limit::fromArray($limitData) : null
         );
     }
 

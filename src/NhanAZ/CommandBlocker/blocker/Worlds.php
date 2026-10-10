@@ -10,27 +10,34 @@ use WeakMap;
 
 final class Worlds {
 
-    private static WeakMap $worlds;
+    /** @var WeakMap<World, WorldBlocker>|null */
+    private static ?WeakMap $worlds = null;
 
     public static function get(World $world) :?WorldBlocker {
-        if(!self::has($world)) {
-            $map = new WeakMap();
-            self::$worlds = $map;
+        self::$worlds ??= new WeakMap();
+        if (isset(self::$worlds[$world])) {
+            return self::$worlds[$world];
         }
-
-        return self::$worlds[$world] ??= self::load($world);
+        $blocker = self::load($world);
+        if ($blocker !== null) {
+            self::$worlds[$world] = $blocker;
+        }
+        return $blocker;
     }
 
     public static function set(World $world, WorldBlocker $blocker) : void {
+        self::$worlds ??= new WeakMap();
         self::$worlds[$world] = $blocker;
     }
 
     public static function remove(World $world) : void {
-        unset(self::$worlds[$world]);
+        if (self::$worlds !== null) {
+            unset(self::$worlds[$world]);
+        }
     }
 
     public static function has(World $world) : bool {
-        return isset(self::$worlds[$world]);
+        return self::$worlds !== null && isset(self::$worlds[$world]);
     }
 
     public static function load(World $world) : ?WorldBlocker {

@@ -8,13 +8,15 @@ use NhanAZ\CommandBlocker\blocker\command\CommandBlocker;
 
 class WorldBlocker {
 
-    /** @var CommandBlocker[] $blocker*/
+    /** @var list<CommandBlocker> */
     private array $blocker;
 
+    /** @param list<CommandBlocker> $blocker */
     public function __construct(array $blocker) {
         $this->blocker = $blocker;
     }
 
+    /** @return list<CommandBlocker> */
     public function getCommandBlockers(): array {
         return $this->blocker;
     }
@@ -28,6 +30,7 @@ class WorldBlocker {
         return null;
     }
 
+    /** @param list<string> $permissions */
     public function testPermissions(array $permissions): ?CommandBlocker {
         foreach ($this->blocker as $blocker) {
             $intersect = array_intersect($blocker->getPermissions(), $permissions);
@@ -38,6 +41,7 @@ class WorldBlocker {
         return null;
     }
 
+    /** @return list<string> */
     public function getCommands() :array {
         $commands = [];
         foreach ($this->blocker as $blocker) {
@@ -55,6 +59,7 @@ class WorldBlocker {
         return false;
     }
 
+    /** @return list<array<string, mixed>> */
     public function toArray(): array {
         $array = [];
         foreach ($this->blocker as $blocker) {
@@ -64,9 +69,7 @@ class WorldBlocker {
     }
 
     /**
-     * @param CommandBlocker[] $commandBlockers
-     *
-     * @return WorldBlocker
+     * @param list<CommandBlocker> $commandBlockers
      */
     public static function fromArray(array $commandBlockers) : WorldBlocker {
         return new WorldBlocker($commandBlockers);
